@@ -1,5 +1,5 @@
 const express = require('express');
-const { Queue } = require('bullmq');
+const { Queue, QueueScheduler, Worker } = require('bullmq');
 const multer = require('multer');
 const path = require('path');
 
@@ -10,27 +10,43 @@ const HOST_REDIS = '127.0.0.1';
 const PORT_REDIS = 6379;
 
 // Kết nối tới Redis
-const timerQueue = new Queue('timerQueue', {
+const imageQueue = new Queue('imageQueue', {
   connection: {
     host: HOST_REDIS,
     port: PORT_REDIS,
   },
 });
 
+// Thiết lập QueueScheduler để quản lý trạng thái của các job
+new QueueScheduler('imageQueue', {
+  connection: {
+    host: HOST_REDIS,
+    port: PORT_REDIS,
+  },
+});
+
+// Thiết lập multer để lưu trữ file upload
 const upload = multer({ dest: path.join(__dirname, 'uploads') });
 
+// Endpoint để upload hình ảnh
 app.post('/start-task', upload.single('image'), async (req, res) => {
-  const duration = req.query.duration || 5000;
   const imagePath = req.file.path;
 
-  await timerQueue.add('processTimer', { duration, imagePath });
+  // Thêm tác vụ vào hàng đợi
+  const job = await imageQueue.add('processImage', { imagePath });
 
-  res.send(`Task started with duration ${duration}ms`);
+  // Đợi cho tác vụ hoàn thành và trả về URL hình ảnh
+  job
+    .finished()
+    .then((result) => {
+      res.send({ imageUrl: result.imageUrl });
+    })
+    .catch((err) => {
+      res.status(500).send(err.message);
+    });
 });
 
-app.get('/health-check', async (req, res) => {
-  res.json({ status: 'ok' });
-});
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 app.listen(port, () => {
   console.log(`Server is running on http://localhost:${port}`);
