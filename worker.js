@@ -1,13 +1,11 @@
 const { Worker, Queue } = require('bullmq');
 const path = require('path');
 const sharp = require('sharp');
-
-const HOST_REDIS = '127.0.0.1';
-const PORT_REDIS = 6379;
+var CONFIGS = require("./configs");
 
 // Kết nối tới Redis
 const worker = new Worker(
-  'imageQueue',
+  CONFIGS.TASK_QUEUE_IMAGE_PROCESSOR,
   async (job) => {
     const { imagePath } = job.data;
 
@@ -18,7 +16,7 @@ const worker = new Worker(
     const inputPath = path.resolve(imagePath);
     const outputPath = path.resolve(
       __dirname,
-      `uploads/thumbnail-${path.basename(imagePath)}`
+      `uploads/thumbnail-${path.basename(imagePath)}.jpg`
     );
 
     // Xử lý hình ảnh: tạo thumbnail
@@ -28,15 +26,15 @@ const worker = new Worker(
 
     // Lưu kết quả URL của hình ảnh
     return {
-      imageUrl: `http://localhost:3000/uploads/thumbnail-${path.basename(
+      imageUrl: `/uploads/thumbnail-${path.basename(
         imagePath
-      )}`,
+      )}.jpg`,
     };
   },
   {
     connection: {
-      host: HOST_REDIS,
-      port: PORT_REDIS,
+      host: CONFIGS.HOST_REDIS,
+      port: CONFIGS.PORT_REDIS,
     },
   }
 );

@@ -1,27 +1,30 @@
 const express = require('express');
-const { Queue, QueueScheduler, Worker } = require('bullmq');
+const { Queue, QueueEvents, Worker } = require("bullmq");
 const multer = require('multer');
 const path = require('path');
+var CONFIGS = require("./configs");
 
 const app = express();
 const port = 3000;
 
-const HOST_REDIS = '127.0.0.1';
-const PORT_REDIS = 6379;
-
 // Kết nối tới Redis
-const imageQueue = new Queue('imageQueue', {
+const imageQueue = new Queue(CONFIGS.TASK_QUEUE_IMAGE_PROCESSOR, {
   connection: {
-    host: HOST_REDIS,
-    port: PORT_REDIS,
+    host: CONFIGS.HOST_REDIS,
+    port: CONFIGS.PORT_REDIS,
   },
 });
 
-// Thiết lập QueueScheduler để quản lý trạng thái của các job
-new QueueScheduler('imageQueue', {
+
+app.get('/health-check', (req, res) => {
+  res.send('OK');
+});
+
+// Tạo QueueEvents để theo dõi trạng thái của các job
+const imageQueueEvents = new QueueEvents(CONFIGS.TASK_QUEUE_IMAGE_PROCESSOR, {
   connection: {
-    host: HOST_REDIS,
-    port: PORT_REDIS,
+    host: CONFIGS.HOST_REDIS,
+    port: CONFIGS.PORT_REDIS,
   },
 });
 
@@ -29,24 +32,26 @@ new QueueScheduler('imageQueue', {
 const upload = multer({ dest: path.join(__dirname, 'uploads') });
 
 // Endpoint để upload hình ảnh
-app.post('/start-task', upload.single('image'), async (req, res) => {
+app.post('/upload-image', upload.single('image'), async (req, res) => {
   const imagePath = req.file.path;
 
   // Thêm tác vụ vào hàng đợi
-  const job = await imageQueue.add('processImage', { imagePath });
+  const job = await imageQueue.add(CONFIGS.TASK_ADD_IMAGE_PROCESSOR, { imagePath });
 
-  // Đợi cho tác vụ hoàn thành và trả về URL hình ảnh
-  job
-    .finished()
-    .then((result) => {
-      res.send({ imageUrl: result.imageUrl });
-    })
-    .catch((err) => {
-      res.status(500).send(err.message);
-    });
+  try {
+    // Đợi cho tác vụ hoàn thành và trả về URL hình ảnh
+    job
+    const result = await job.waitUntilFinished(imageQueueEvents);
+    res.json({ success: true, data: {imageUrl: result.imageUrl} });
+  } catch (error) {
+    res.status(500).send(error.message);
+  }
+  
 });
 
+
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
 
 app.listen(port, () => {
   console.log(`Server is running on http://localhost:${port}`);
