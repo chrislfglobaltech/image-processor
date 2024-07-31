@@ -3,6 +3,8 @@ const path = require('path');
 const sharp = require('sharp');
 var CONFIGS = require("./configs");
 
+const DEBOUNDCE_PROCESSOR_IMAGE = 0;
+
 // Kết nối tới Redis
 const worker = new Worker(
   CONFIGS.TASK_QUEUE_IMAGE_PROCESSOR,
@@ -10,7 +12,9 @@ const worker = new Worker(
     const { imagePath } = job.data;
 
     // Giả lập công việc cần thời gian để xử lý bằng cách sử dụng setTimeout
-    await new Promise((resolve) => setTimeout(resolve, 5000));
+    await new Promise((resolve) =>
+      setTimeout(resolve, DEBOUNDCE_PROCESSOR_IMAGE)
+    );
 
     // Đảm bảo đường dẫn tệp đúng
     const inputPath = path.resolve(imagePath);
