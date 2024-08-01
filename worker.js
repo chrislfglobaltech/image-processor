@@ -3,7 +3,7 @@ const path = require('path');
 const sharp = require('sharp');
 var CONFIGS = require("./configs");
 
-const DEBOUNDCE_PROCESSOR_IMAGE = 0;
+const DEBOUNDCE_PROCESSOR_IMAGE = 500;
 
 // Kết nối tới Redis
 const worker = new Worker(
@@ -16,23 +16,19 @@ const worker = new Worker(
       setTimeout(resolve, DEBOUNDCE_PROCESSOR_IMAGE)
     );
 
-    // Đảm bảo đường dẫn tệp đúng
     const inputPath = path.resolve(imagePath);
     const outputPath = path.resolve(
       __dirname,
       `uploads/thumbnail-${path.basename(imagePath)}.jpg`
     );
 
-    // Xử lý hình ảnh: tạo thumbnail
+    // Resize image to 200x200
     await sharp(inputPath).resize(200, 200).toFile(outputPath);
 
     console.log(`Processed job for image ${imagePath}`);
 
-    // Lưu kết quả URL của hình ảnh
     return {
-      imageUrl: `/uploads/thumbnail-${path.basename(
-        imagePath
-      )}.jpg`,
+      imageUrl: `/uploads/thumbnail-${path.basename(imagePath)}.jpg`,
     };
   },
   {
